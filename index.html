@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Lucky Draw - Complete</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+<style>
+:root{--p:#7c3aed;--p2:#ec4899;--ok:#10b981}
+*{box-sizing:border-box;font-family:Inter,system-ui,sans-serif;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:linear-gradient(135deg,#f8f5ff 0%,#ffe4f0 100%);min-height:100vh;color:#111827}
+.container{max-width:520px;margin:0 auto;padding:14px}
+.header{background:linear-gradient(135deg,var(--p),var(--p2));color:#fff;border-radius:24px;padding:18px;text-align:center;box-shadow:0 10px 30px rgba(124,58,237,.3)}
+.header h1{margin:0;font-size:22px}
+.card{background:#fff;border-radius:20px;padding:14px;margin-top:14px;box-shadow:0 4px 20px rgba(0,0,0,.06)}
+.tabs{display:flex;gap:6px;margin-bottom:12px}
+.tab{flex:1;padding:10px;border-radius:12px;border:1.5px solid #e5e7eb;background:#f9fafb;text-align:center;cursor:pointer;font-weight:700;font-size:12px}
+.tab.active{background:var(--p);color:#fff;border-color:var(--p)}
+textarea,input,select{width:100%;border:1.5px solid #e5e7eb;border-radius:12px;padding:11px;font-size:14px;outline:none;background:#fff}
+textarea:focus,input:focus,select:focus{border-color:var(--p)}
+.btn{width:100%;padding:14px;border:none;border-radius:14px;font-weight:800;font-size:14px;cursor:pointer;transition:.15s}
+.btn:disabled{opacity:.5;pointer-events:none}
+.btn-primary{background:linear-gradient(135deg,var(--p),var(--p2));color:#fff;box-shadow:0 6px 20px rgba(124,58,237,.25)}
+.btn:active{transform:scale(.98)}
+.row{display:flex;gap:8px}
+.badge{background:#ede9fe;color:var(--p);padding:3px 9px;border-radius:99px;font-size:11px;font-weight:800}
+.display{height:170px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:26px;font-weight:900;text-align:center;background:radial-gradient(circle at center,#fef3c7,#fde68a);border-radius:16px;margin:12px 0;border:2px dashed #f59e0b;color:#92400e;position:relative;overflow:hidden}
+.display.spinning{animation:shake .08s infinite}
+@keyframes shake{0%{transform:translateX(-2px) rotate(-.3deg)}50%{transform:translateX(2px) rotate(.3deg)}100%{transform:translateX(-2px)}}
+.timer{font-size:11px;font-weight:700;letter-spacing:1px;color:#b45309;margin-top:4px}
+.winner-card{background:linear-gradient(135deg,var(--ok),#059669);color:#fff;border-radius:16px;padding:16px;text-align:center;margin-top:12px}
+.file-drop{border:2px dashed #c4b5fd;border-radius:12px;padding:18px;text-align:center;background:#f5f3ff;cursor:pointer}
+.preview{max-height:160px;overflow:auto;border:1px solid #e5e7eb;border-radius:10px;margin-top:8px}
+.preview table{width:100%;border-collapse:collapse;font-size:12px}
+.preview th{background:#f3f4f6;position:sticky;top:0;padding:6px;text-align:left}
+.preview td{padding:5px 6px;border-top:1px solid #f3f4f6}
+.opt{display:flex;gap:6px;align-items:center;font-size:12px;background:#f9fafb;padding:8px 10px;border-radius:10px;border:1px solid #e5e7eb}
+.history-item{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #f3f4f6;font-size:13px}
+small{color:#6b7280}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="header">
+<h1>🎉 Lucky Draw Pro</h1>
+<div style="font-size:12px;opacity:.9">Crypto-secure • 15s Animation • Confetti • Ticking Sound</div>
+<div style="margin-top:8px"><span class="badge" style="background:#fff;color:var(--p)" id="pCount">0 participants</span> <span class="badge" style="background:rgba(255,255,255,.2);color:#fff" id="secureBadge">🔒 crypto.getRandomValues()</span></div>
+</div>
+
+<div class="card">
+<div class="tabs">
+<div class="tab active" onclick="switchTab('manual')">Manual</div>
+<div class="tab" onclick="switchTab('file')">Excel/CSV</div>
+<div class="tab" onclick="switchTab('history')">History</div>
+</div>
+
+<div id="manualTab">
+<textarea id="nameInput" rows="5" placeholder="One name per line or comma"></textarea>
+<div style="margin-top:8px" class="row">
+<div class="opt"><input type="radio" name="dup" value="remove" checked> Remove duplicates</div>
+<div class="opt"><input type="radio" name="dup" value="keep"> Keep all</div>
+<div class="opt"><input type="radio" name="dup" value="show"> Show dup count</div>
+</div>
+<button class="btn btn-primary" style="margin-top:10px" onclick="addManual()">Add to List</button>
+</div>
+
+<div id="fileTab" style="display:none">
+<div class="file-drop" onclick="document.getElementById('fileInput').click()">📁 Upload .xlsx / .xls / .csv / .txt<div style="font-size:11px">Max 500 participants</div><input type="file" id="fileInput" hidden accept=".xlsx,.xls,.csv,.txt" onchange="handleFile(event)"></div>
+<div id="excelControls" style="display:none;margin-top:10px">
+<div class="row"><div style="flex:1"><small>Sheet</small><select id="sheetSelect" onchange="onSheetChange()"></select></div><div style="flex:1"><small>Column with names</small><select id="colSelect" onchange="renderPreview()"></select></div></div>
+<div class="row" style="margin-top:8px"><div class="opt" style="flex:1"><input type="checkbox" id="hasHeader" checked> First row is header</div></div>
+<small>Preview (first 10 rows):</small><div class="preview" id="previewBox"></div>
+<div class="row" style="margin-top:8px"><button class="btn" style="background:#ede9fe;color:var(--p)" onclick="confirmImport()">✔ Confirm Import</button></div>
+</div>
+<div id="fileStatus" style="font-size:12px;color:#6b7280;margin-top:8px;text-align:center">No file loaded</div>
+</div>
+
+<div id="historyTab" style="display:none">
+<div style="display:flex;gap:6px;margin-bottom:8px"><div class="opt" style="flex:1"><input type="checkbox" id="excludePrev" checked> Exclude previous winners from next draw</div></div>
+<div id="historyList"><div style="text-align:center;color:#9ca3af;font-size:12px">No winners yet</div></div>
+<div class="row" style="margin-top:10px"><button class="btn" style="background:#f3f4f6;flex:1" onclick="clearHistory()">Clear History</button><button class="btn" style="background:#f3f4f6;flex:1" onclick="exportHistory()">Export CSV</button></div>
+</div>
+</div>
+
+<div class="card">
+<div style="display:flex;justify-content:space-between;align-items:center"><strong>Draw Console</strong><span class="badge" id="readyBadge">Add 50+ names</span></div>
+<div class="display" id="display"><span id="displayText">Ready to Draw</span><span class="timer" id="timer"></span></div>
+<div class="row"><div style="width:90px"><small>Winners</small><input id="winnerCount" type="number" value="1" min="1" max="10"></div><div style="flex:1"><small>&nbsp;</small><button class="btn btn-primary" id="spinBtn" onclick="startDraw(false)">🎲 SPIN 15s & PICK</button></div></div>
+<div class="row" style="margin-top:8px"><button class="btn" style="background:#ede9fe;color:var(--p);flex:1" id="againBtn" onclick="startDraw(true)" disabled>↻ Draw Again</button><button class="btn" style="background:#fef3c7;color:#92400e;flex:1" id="replayBtn" onclick="replayAnimation()" disabled>▶ Replay Animation</button></div>
+<button class="btn" style="background:#fef2f2;color:#dc2626;margin-top:8px" onclick="resetAll()">Reset Participants</button>
+</div>
+
+<div id="winnerArea"></div>
+<div style="text-align:center;font-size:10px;color:#9ca3af;margin-top:12px">Bug fixed: undefined winners prevented • Double-click blocked during spin • Stable 15s animation</div>
+</div>
+
+<script>
+let participants=[],winners=JSON.parse(localStorage.getItem('ld_winners_v2')||'[]'),workbook=null,rawData=[],lastPicked=[],isSpinning=false,audioCtx=null;
+function getSecureRandomInt(max){if(max<=0)return 0;const arr=new Uint32Array(1);crypto.getRandomValues(arr);return arr[0]%max;}
+function ensureAudio(){if(!audioCtx)audioCtx=new (window.AudioContext||window.webkitAudioContext)();}
+function playTick(freq=900,dur=0.07,vol=0.12){try{ensureAudio();const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.frequency.value=freq;o.connect(g);g.connect(audioCtx.destination);g.gain.value=vol;o.start();g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+dur);o.stop(audioCtx.currentTime+dur);}catch(e){}}
+function playWin(){try{ensureAudio();[0,1,2].forEach(i=>{setTimeout(()=>playTick(600+i*200,0.4,0.25),i*150);});}catch(e){}}
+function switchTab(t){document.querySelectorAll('.tab').forEach(el=>el.classList.remove('active'));['manualTab','fileTab','historyTab'].forEach(id=>document.getElementById(id).style.display='none');if(t==='manual'){document.querySelectorAll('.tab')[0].classList.add('active');document.getElementById('manualTab').style.display='block';}if(t==='file'){document.querySelectorAll('.tab')[1].classList.add('active');document.getElementById('fileTab').style.display='block';}if(t==='history'){document.querySelectorAll('.tab')[2].classList.add('active');document.getElementById('historyTab').style.display='block';}renderHistory();}
+function updateCount(){document.getElementById('pCount').textContent=participants.length+' participants';const b=document.getElementById('readyBadge');if(participants.length>=50){b.textContent=participants.length+' Ready ✔';b.style.background='#dcfce7';b.style.color='#15803d';}else{b.textContent='Add '+(50-participants.length)+' more';b.style.background='#ede9fe';b.style.color='#7c3aed';}}
+function getDupMode(){return document.querySelector('input[name="dup"]:checked').value;}
+function addManual(){let txt=document.getElementById('nameInput').value.trim();if(!txt)return alert('Enter names');let names=txt.split(/[\n,]+/).map(s=>s.trim()).filter(Boolean);let mode=getDupMode();if(mode==='show'){let dup=names.length-new Set(names).size;if(dup>0)alert('Duplicates found: '+dup);}if(mode==='remove'){names=[...new Set(names)];participants=[...new Set([...participants,...names])];}else{participants=[...participants,...names];}participants=participants.slice(0,500);document.getElementById('nameInput').value='';updateCount();}
+let currentFileName='';function handleFile(e){const file=e.target.files[0];if(!file)return;currentFileName=file.name;document.getElementById('fileStatus').textContent='Reading '+file.name+'...';const ext=file.name.split('.').pop().toLowerCase();if(ext==='txt'||ext==='csv'){const r=new FileReader();r.onload=ev=>{let text=ev.target.result;let rows=text.split(/\r?\n/).map(r=>r.split(',').map(c=>c.trim()));rawData=rows;workbook=null;setupExcelControls();};r.readAsText(file);}else{const r=new FileReader();r.onload=ev=>{workbook=XLSX.read(ev.target.result,{type:'binary'});rawData=null;setupExcelControls();};r.readAsBinaryString(file);}}
+function setupExcelControls(){const sel=document.getElementById('sheetSelect');sel.innerHTML='';let sheets=[];if(workbook){sheets=workbook.SheetNames;sheets.forEach(s=>{let o=document.createElement('option');o.value=s;o.textContent=s;sel.appendChild(o);});}else{sheets=['Sheet1'];let o=document.createElement('option');o.value='Sheet1';o.textContent='TXT/CSV';sel.appendChild(o);}document.getElementById('excelControls').style.display='block';onSheetChange();}
+function onSheetChange(){let cols=[];let data=[];if(workbook){const ws=workbook.Sheets[document.getElementById('sheetSelect').value];data=XLSX.utils.sheet_to_json(ws,{header:1});}else{data=rawData;}if(data.length>0){let maxCols=Math.max(...data.map(r=>r.length));for(let i=0;i<maxCols;i++){cols.push('Column '+(i+1)+(data[0]&&data[0][i]?' - '+String(data[0][i]).slice(0,20):''));}}const colSel=document.getElementById('colSelect');colSel.innerHTML='';cols.forEach((c,i)=>{let o=document.createElement('option');o.value=i;o.textContent=c;colSel.appendChild(o);});window._lastSheetData=data;renderPreview();}
+function renderPreview(){const data=window._lastSheetData||[];const colIdx=parseInt(document.getElementById('colSelect').value||0);const hasHeader=document.getElementById('hasHeader').checked;let html='<table><tr><th>#</th><th>Value</th></tr>';let start=hasHeader?1:0;for(let i=start;i<Math.min(data.length,start+10);i++){let val=(data[i]&&data[i][colIdx])?String(data[i][colIdx]).trim():'';if(!val)continue;html+='<tr><td>'+(i+1)+'</td><td>'+val.replace(/</g,'&lt;')+'</td></tr>';}html+='</table>';document.getElementById('previewBox').innerHTML=html;}
+function confirmImport(){const data=window._lastSheetData||[];const colIdx=parseInt(document.getElementById('colSelect').value||0);const hasHeader=document.getElementById('hasHeader').checked;let names=[];let start=hasHeader?1:0;for(let i=start;i<data.length;i++){let v=data[i]&&data[i][colIdx]?String(data[i][colIdx]).trim():'';if(!v)continue;if(/S\.?No|Name/i.test(v)&&i===start)continue;names.push(v);}let mode=getDupMode();if(mode==='remove'){names=[...new Set(names)];participants=[...new Set([...participants,...names])];}else{participants=[...participants,...names];}participants=participants.slice(0,500);updateCount();document.getElementById('fileStatus').textContent=currentFileName+' imported: '+names.length+' names. Total: '+participants.length;document.getElementById('excelControls').style.display='none';}
+function getAvailablePool(){let exclude=document.getElementById('excludePrev').checked;if(!exclude)return [...participants];let prevSet=new Set(winners.map(w=>w.name));return participants.filter(p=>!prevSet.has(p));}
+function startDraw(isAgain){if(isSpinning)return;let pool=isAgain?getAvailablePool():[...participants];if(pool.length===0){alert(excludePrev.checked?'No participants left after excluding previous winners. Clear history or uncheck exclude.':'Add participants first');return;}let count=parseInt(document.getElementById('winnerCount').value)||1;if(count>pool.length){alert('Only '+pool.length+' participants available. Picking '+pool.length+' winners.');count=pool.length;}isSpinning=true;document.getElementById('spinBtn').disabled=true;document.getElementById('againBtn').disabled=true;document.getElementById('replayBtn').disabled=true;const display=document.getElementById('display');const displayText=document.getElementById('displayText');const timerEl=document.getElementById('timer');display.classList.add('spinning');let elapsed=0,duration=15000,interval=80;let tickInt=setInterval(()=>playTick(800+getSecureRandomInt(400),0.05,0.08),120);let animInt=setInterval(()=>{elapsed+=interval;displayText.textContent=pool[getSecureRandomInt(pool.length)];timerEl.textContent=((duration-elapsed)/1000).toFixed(1)+'s • crypto random';if(elapsed>=duration){clearInterval(animInt);clearInterval(tickInt);finishDraw(pool,count);}},interval);}
+function finishDraw(pool,count){isSpinning=false;const display=document.getElementById('display');display.classList.remove('spinning');let picked=[];let temp=[...pool];for(let k=0;k<count;k++){if(temp.length===0)break;let idx=getSecureRandomInt(temp.length);picked.push(temp.splice(idx,1)[0]);}lastPicked=picked;document.getElementById('displayText').textContent=picked[0]||'—';document.getElementById('timer').textContent='WINNER • crypto-secure';playWin();if(window.confetti){confetti({particleCount:180,spread:90,origin:{y:0.6}});setTimeout(()=>confetti({particleCount:100,angle:60,spread:55,origin:{x:0}}),200);setTimeout(()=>confetti({particleCount:100,angle:120,spread:55,origin:{x:1}}),400);}let area=document.getElementById('winnerArea');area.innerHTML='<div class="winner-card"><div style="font-size:11px;opacity:.8;letter-spacing:1px">WINNER ANNOUNCEMENT • '+new Date().toLocaleString()+'</div><div style="font-size:22px;font-weight:900;margin:10px 0;line-height:1.3">'+picked.map(p=>'🏆 '+p.replace(/</g,'&lt;')).join('<br>')+'</div><div style="font-size:11px;opacity:.9">'+count+' winner(s) from '+pool.length+' eligible • '+participants.length+' total</div></div>';picked.forEach(n=>{winners.unshift({name:n,time:new Date().toLocaleString(),total:participants.length});});localStorage.setItem('ld_winners_v2',JSON.stringify(winners));renderHistory();document.getElementById('spinBtn').disabled=false;document.getElementById('againBtn').disabled=false;document.getElementById('replayBtn').disabled=false;document.getElementById('againBtn').textContent='↻ Draw Again ('+getAvailablePool().length+' left)';}
+function replayAnimation(){if(lastPicked.length===0)return alert('No last draw to replay');if(isSpinning)return;isSpinning=true;document.getElementById('spinBtn').disabled=true;document.getElementById('againBtn').disabled=true;document.getElementById('replayBtn').disabled=true;const display=document.getElementById('display');display.classList.add('spinning');let elapsed=0,duration=8000,interval=80;let tickInt=setInterval(()=>playTick(800,0.05,0.08),120);let animInt=setInterval(()=>{elapsed+=interval;document.getElementById('displayText').textContent=participants[getSecureRandomInt(participants.length)]||lastPicked[0];document.getElementById('timer').textContent='Replaying... '+(duration-elapsed)/1000|0+'s';if(elapsed>=duration){clearInterval(animInt);clearInterval(tickInt);isSpinning=false;display.classList.remove('spinning');document.getElementById('displayText').textContent=lastPicked[0];document.getElementById('timer').textContent='REPLAY';playWin();if(window.confetti)confetti({particleCount:120,spread:70});document.getElementById('spinBtn').disabled=false;document.getElementById('againBtn').disabled=false;document.getElementById('replayBtn').disabled=false;}},interval);}
+function renderHistory(){let list=document.getElementById('historyList');if(winners.length===0){list.innerHTML='<div style="text-align:center;color:#9ca3af;font-size:12px">No winners yet</div>';return;}list.innerHTML=winners.map(w=>'<div class="history-item"><span>🏆 '+String(w.name).replace(/</g,'&lt;')+'</span><span style="font-size:11px;color:#6b7280">'+w.time+'</span></div>').join('');document.getElementById('againBtn').textContent='↻ Draw Again ('+getAvailablePool().length+' left)';}
+function clearHistory(){if(!confirm('Clear winner history?'))return;winners=[];localStorage.removeItem('ld_winners_v2');renderHistory();}
+function exportHistory(){if(winners.length===0)return alert('No history');let csv='Name,Time,Total\n'+winners.map(w=>'"'+String(w.name).replace(/"/g,'""')+'",'+w.time+','+w.total).join('\n');let blob=new Blob([csv],{type:'text/csv'});let a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='lucky_draw_winners.csv';a.click();}
+function resetAll(){if(!confirm('Reset participants & display? Winners history kept.'))return;participants=[];updateCount();document.getElementById('displayText').textContent='Ready to Draw';document.getElementById('timer').textContent='';document.getElementById('winnerArea').innerHTML='';}
+renderHistory();updateCount();
+</script>
+</body>
+</html>
