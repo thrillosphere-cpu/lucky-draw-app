@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lucky Draw App</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--p:#7c3aed;--p2:#ec4899;--bg:#f8f5ff}
+*{box-sizing:border-box;font-family:Inter,system-ui,sans-serif}
+body{margin:0;background:linear-gradient(135deg,#f8f5ff 0%,#ffe4f0 100%);min-height:100vh;color:#1f2937}
+.container{max-width:480px;margin:0 auto;padding:16px}
+.header{background:linear-gradient(135deg,var(--p),var(--p2));color:white;border-radius:24px;padding:20px;text-align:center;box-shadow:0 10px 30px rgba(124,58,237,.3)}
+.header h1{margin:0;font-size:24px}
+.header p{opacity:.9;margin:6px 0 0;font-size:13px}
+.card{background:white;border-radius:20px;padding:16px;margin-top:16px;box-shadow:0 4px 20px rgba(0,0,0,.06)}
+.tabs{display:flex;gap:8px;margin-bottom:12px}
+.tab{flex:1;padding:10px;border-radius:12px;border:1.5px solid #e5e7eb;background:#f9fafb;text-align:center;cursor:pointer;font-weight:600;font-size:13px}
+.tab.active{background:var(--p);color:white;border-color:var(--p)}
+textarea,input{width:100%;border:1.5px solid #e5e7eb;border-radius:12px;padding:12px;font-size:14px;outline:none}
+textarea:focus,input:focus{border-color:var(--p)}
+.btn{width:100%;padding:14px;border:none;border-radius:14px;font-weight:700;font-size:15px;cursor:pointer}
+.btn-primary{background:linear-gradient(135deg,var(--p),var(--p2));color:white;box-shadow:0 6px 20px rgba(124,58,237,.3)}
+.count{font-size:12px;color:#6b7280;margin-top:8px;text-align:center}
+.display{height:160px;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:900;text-align:center;background:linear-gradient(135deg,#fef3c7,#fde68a);border-radius:16px;margin:12px 0;border:2px dashed #f59e0b;color:#92400e}
+.display.spinning{animation:shake .1s infinite}
+@keyframes shake{0%{transform:translateX(-2px)}50%{transform:translateX(2px)}100%{transform:translateX(-2px)}}
+.winner{animation:pop .6s cubic-bezier(.34,1.56,.64,1)}
+@keyframes pop{0%{transform:scale(.5)}100%{transform:scale(1)}}
+.file-drop{border:2px dashed #c4b5fd;border-radius:12px;padding:20px;text-align:center;background:#f5f3ff;cursor:pointer}
+.winner-card{background:linear-gradient(135deg,#10b981,#059669);color:white;border-radius:16px;padding:16px;text-align:center;margin-top:12px}
+.history-item{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f3f4f6;font-size:14px}
+.badge{background:#ede9fe;color:var(--p);padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="header">
+<h1>🎉 Lucky Draw</h1>
+<p>50 - 500 Participants • Mobile Friendly</p>
+<p style="font-size:11px;margin-top:8px">Participants: <span id="pCount">0</span></p>
+</div>
+<div class="card">
+<div class="tabs">
+<div class="tab active" onclick="switchTab('manual')">Manual</div>
+<div class="tab" onclick="switchTab('file')">Excel/CSV/TXT</div>
+<div class="tab" onclick="switchTab('history')">History</div>
+</div>
+<div id="manualTab">
+<textarea id="nameInput" rows="5" placeholder="Enter names, one per line"></textarea>
+<button class="btn btn-primary" style="margin-top:10px" onclick="addManual()">Add Participants</button>
+</div>
+<div id="fileTab" style="display:none">
+<div class="file-drop" onclick="document.getElementById('fileInput').click()">
+📁 Click to Upload Excel / CSV / TXT<br><small>.xlsx, .xls, .csv, .txt</small>
+<input type="file" id="fileInput" hidden accept=".xlsx,.xls,.csv,.txt" onchange="handleFile(event)">
+</div>
+<div class="count" id="fileStatus">Use your 500 names file for testing</div>
+</div>
+<div id="historyTab" style="display:none">
+<div id="historyList"><div class="count">No winners yet</div></div>
+<button class="btn" style="background:#f3f4f6;margin-top:10px" onclick="clearHistory()">Clear History</button>
+</div>
+</div>
+<div class="card">
+<div style="display:flex;gap:8px;align-items:center;justify-content:space-between">
+<strong>Draw Console</strong><span class="badge" id="readyBadge">Add 50+ names</span>
+</div>
+<div class="display" id="display">Ready to Draw</div>
+<div style="display:flex;gap:8px">
+<input id="winnerCount" type="number" value="1" min="1" max="10" style="width:80px">
+<button class="btn btn-primary" style="flex:1" onclick="startDraw()">🎲 SPIN & PICK WINNER</button>
+</div>
+<button class="btn" style="background:#fef2f2;color:#dc2626;margin-top:8px" onclick="resetAll()">Reset All</button>
+</div>
+<div id="winnerArea"></div>
+</div>
+<script>
+let participants=[];
+let winners=JSON.parse(localStorage.getItem('ld_winners')||'[]');
+renderHistory();
+function switchTab(t){
+ document.querySelectorAll('.tab').forEach(el=>el.classList.remove('active'));
+ document.getElementById('manualTab').style.display='none';
+ document.getElementById('fileTab').style.display='none';
+ document.getElementById('historyTab').style.display='none';
+ if(t==='manual'){document.querySelectorAll('.tab')[0].classList.add('active');document.getElementById('manualTab').style.display='block';}
+ if(t==='file'){document.querySelectorAll('.tab')[1].classList.add('active');document.getElementById('fileTab').style.display='block';}
+ if(t==='history'){document.querySelectorAll('.tab')[2].classList.add('active');document.getElementById('historyTab').style.display='block';}
+}
+function updateCount(){
+ document.getElementById('pCount').textContent=participants.length;
+ document.getElementById('readyBadge').textContent=participants.length>=50? participants.length+' Ready ✔' : 'Add '+(50-participants.length)+' more';
+}
+function addManual(){
+ let txt=document.getElementById('nameInput').value.trim();
+ if(!txt) return alert('Enter names');
+ let names=txt.split(/[\n,]+/).map(s=>s.trim()).filter(Boolean);
+ participants=[...new Set([...participants,...names])].slice(0,500);
+ document.getElementById('nameInput').value='';
+ updateCount();
+}
+function handleFile(e){
+ const file=e.target.files[0];
+ if(!file) return;
+ const ext=file.name.split('.').pop().toLowerCase();
+ if(ext==='txt' || ext==='csv'){
+   const reader=new FileReader();
+   reader.onload=ev=>{
+     let text=ev.target.result;
+     let names=text.split(/\r?\n|,/).map(s=>s.trim().replace(/"/g,'')).filter(s=>s && !/S\.No|Name/i.test(s));
+     participants=[...new Set([...participants,...names])].slice(0,500);
+     updateCount();
+     document.getElementById('fileStatus').textContent=file.name+' loaded: '+names.length+' names';
+   };
+   reader.readAsText(file);
+ } else {
+   const reader=new FileReader();
+   reader.onload=ev=>{
+     const wb=XLSX.read(ev.target.result,{type:'binary'});
+     const ws=wb.Sheets[wb.SheetNames[0]];
+     const data=XLSX.utils.sheet_to_json(ws,{header:1});
+     let names=data.flat().map(v=>String(v||'').trim()).filter(v=>v && !/S\.No|Name/i.test(v) && isNaN(v));
+     participants=[...new Set([...participants,...names])].slice(0,500);
+     updateCount();
+     document.getElementById('fileStatus').textContent=file.name+' loaded: '+names.length+' names';
+   };
+   reader.readAsBinaryString(file);
+ }
+}
+function startDraw(){
+ if(participants.length<1) return alert('Add participants first');
+ let count=parseInt(document.getElementById('winnerCount').value)||1;
+ let display=document.getElementById('display');
+ let area=document.getElementById('winnerArea');
+ display.classList.add('spinning');
+ let i=0, spins=30;
+ let interval=setInterval(()=>{
+   display.textContent=participants[Math.floor(Math.random()*participants.length)];
+   if(++i>=spins){
+     clearInterval(interval);
+     display.classList.remove('spinning');
+     let picked=[];
+     let pool=[...participants];
+     for(let k=0;k<count;k++){
+       let idx=Math.floor(Math.random()*pool.length);
+       picked.push(pool.splice(idx,1)[0]);
+     }
+     try{let a=new AudioContext();let o=a.createOscillator();o.frequency.value=880;o.connect(a.destination);o.start();setTimeout(()=>o.stop(),300);}catch(e){}
+     display.textContent='🎉 '+picked[0]+' 🎉';
+     display.classList.add('winner');
+     area.innerHTML='<div class="winner-card"><div style="font-size:12px;opacity:.8">WINNER ANNOUNCEMENT</div><div style="font-size:22px;font-weight:900;margin:8px 0">'+picked.join('<br>')+'</div></div>';
+     picked.forEach(n=>{winners.unshift({name:n,time:new Date().toLocaleString()});});
+     localStorage.setItem('ld_winners',JSON.stringify(winners));
+     renderHistory();
+     setTimeout(()=>display.classList.remove('winner'),800);
+   }
+ },80);
+}
+function renderHistory(){
+ let list=document.getElementById('historyList');
+ if(winners.length===0){list.innerHTML='<div class="count">No winners yet</div>';return;}
+ list.innerHTML=winners.map(w=>'<div class="history-item"><span>🏆 '+w.name+'</span><span style="font-size:11px;color:#6b7280">'+w.time+'</span></div>').join('');
+}
+function clearHistory(){winners=[];localStorage.removeItem('ld_winners');renderHistory();}
+function resetAll(){if(confirm('Reset participants?')){participants=[];updateCount();document.getElementById('display').textContent='Ready to Draw';document.getElementById('winnerArea').innerHTML='';}}
+</script>
+</body>
+</html>
