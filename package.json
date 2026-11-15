@@ -1,0 +1,16 @@
+
+{
+  "name": "lucky-draw-app",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "mkdir -p www && cp index.html manifest.json sw.js icon-192.png icon-512.png www/"
+  },
+  "dependencies": {
+    "@capacitor/core": "^8.0.0",
+    "@capacitor/android": "^8.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.0.0"
+  }
+}
