@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lucky Draw Pro</title>
+<meta name="theme-color" content="#0f172a">
+<meta name="description" content="Professional Lucky Draw App with 3D Effects">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:linear-gradient(135deg,#0f172a,#1e293b);min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-family:Arial,sans-serif;padding:20px}
+h1{font-size:2.5rem;margin-bottom:10px;text-shadow:0 0 20px #38bdf8}
+p{opacity:.8;margin-bottom:20px}
+#wheel{width:300px;height:300px;border-radius:50%;border:10px solid #38bdf8;position:relative;overflow:hidden;box-shadow:0 0 30px #38bdf8, inset 0 0 30px rgba(56,189,248,.3);transition:transform 4s cubic-bezier(.17,.67,.12,.99);background:conic-gradient(#0ea5e9 0 60deg,#38bdf8 60deg 120deg,#0284c7 120deg 180deg,#0ea5e9 180deg 240deg,#38bdf8 240deg 300deg,#0284c7 300deg 360deg);display:flex;align-items:center;justify-content:center}
+#center{width:70px;height:70px;background:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#0f172a;font-weight:900;box-shadow:0 0 15px #fff;z-index:2}
+#pointer{width:0;height:0;border-left:20px solid transparent;border-right:20px solid transparent;border-top:40px solid #facc15;position:absolute;top:-10px;left:50%;transform:translateX(-50%);filter:drop-shadow(0 0 10px #facc15);z-index:3}
+button{margin-top:30px;padding:15px 40px;font-size:1.2rem;font-weight:800;background:linear-gradient(90deg,#0ea5e9,#38bdf8);border:none;border-radius:30px;color:#fff;cursor:pointer;box-shadow:0 0 20px #38bdf8;transition:.3s}
+button:hover{transform:scale(1.05);box-shadow:0 0 30px #38bdf8}
+#result{margin-top:25px;font-size:1.8rem;font-weight:800;min-height:40px;text-shadow:0 0 15px #facc15}
+input{margin-top:20px;padding:12px 20px;width:300px;max-width:90%;border-radius:25px;border:2px solid #38bdf8;background:rgba(255,255,255,.1);color:#fff;text-align:center}
+input::placeholder{color:rgba(255,255,255,.6)}
+</style>
+</head>
+<body>
+<h1>🎉 Lucky Draw Pro</h1>
+<p>Enter names separated by comma</p>
+<input id="names" placeholder="e.g. Ahmed, Sara, Ali, Fatima">
+<div style="position:relative;margin-top:30px"><div id="pointer"></div><div id="wheel"><div id="center">SPIN</div></div></div>
+<button onclick="spin()">SPIN WHEEL</button>
+<div id="result"></div>
+
+<script>
+let rotation=0;
+function spin(){
+ const input=document.getElementById('names').value.trim();
+ if(!input){document.getElementById('result').innerText='⚠️ Enter names first!';return;}
+ const list=input.split(',').map(s=>s.trim()).filter(s=>s);
+ if(list.length<2){document.getElementById('result').innerText='⚠️ Enter at least 2 names!';return;}
+ const wheel=document.getElementById('wheel');
+ const extra=1800+Math.random()*1800;
+ rotation+=extra;
+ wheel.style.transform=`rotate(${rotation}deg)`;
+ setTimeout(()=>{
+  const winner=list[Math.floor(Math.random()*list.length)];
+  document.getElementById('result').innerHTML=`🏆 Winner: <span style="color:#facc15">${winner}</span> 🎊`;
+  if(navigator.vibrate) navigator.vibrate([100,50,100]);
+ },4000);
+}
+// PWA Service Worker
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js')
+    .then(reg => console.log('SW registered'))
+    .catch(err => console.log('SW failed', err));
+  });
+}
+</script>
+</body>
+</html>
